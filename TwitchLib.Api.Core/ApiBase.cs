@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -212,6 +213,25 @@ namespace TwitchLib.Api.Core
             return await _rateLimiter.PerformAsync(async () =>
             {
                 var req = await _http.GeneralRequestAsync(url, "DELETE", null, api, clientId, accessToken).ConfigureAwait(false);
+                return JsonConvert.DeserializeObject<T>(req.Value, _twitchLibJsonDeserializer);
+            }).ConfigureAwait(false);
+        }
+
+        public async Task<T> TwitchCustomRequestAsync<T>(string resource, ApiVersion api, string method, HttpContent payload,
+            List<KeyValuePair<string, string>> getParams = null, string accessToken = null, string clientId = null,
+            string customBase = null)
+        {
+            var url = ConstructResourceUrl(resource, getParams, api, customBase);
+
+            if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(Settings.ClientId))
+                clientId = Settings.ClientId;
+
+            accessToken = await GetAccessTokenAsync(accessToken).ConfigureAwait(false);
+            ForceAccessTokenAndClientIdForHelix(clientId, accessToken, api);
+
+            return await _rateLimiter.PerformAsync(async () =>
+            {
+                var req = await _http.CustomRequestAsync(url, method, payload, api, clientId, accessToken).ConfigureAwait(false);
                 return JsonConvert.DeserializeObject<T>(req.Value, _twitchLibJsonDeserializer);
             }).ConfigureAwait(false);
         }

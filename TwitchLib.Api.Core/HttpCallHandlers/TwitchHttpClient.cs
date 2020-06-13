@@ -103,6 +103,48 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
             return (int)response.StatusCode;
         }
 
+        public async Task<KeyValuePair<int, string>> CustomRequestAsync(string url, string method, HttpContent payload, ApiVersion api, string clientId,
+            string accessToken)
+        {
+            var request = new HttpRequestMessage
+            {
+                RequestUri = new Uri(url),
+                Method = new HttpMethod(method),
+                Content = payload
+            };
+
+            if (string.IsNullOrEmpty(clientId) && string.IsNullOrEmpty(accessToken))
+                throw new InvalidCredentialException("A Client-Id or OAuth token is required to use the Twitch API. If you previously set them in InitializeAsync, please be sure to await the method.");
+
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                request.Headers.Add("Client-ID", clientId);
+            }
+
+            var authPrefix = "OAuth";
+            if (api == ApiVersion.Helix)
+            {
+                request.Headers.Add(HttpRequestHeader.Accept.ToString(), "application/json");
+                authPrefix = "Bearer";
+            }
+            else if (api != ApiVersion.Void)
+            {
+                request.Headers.Add(HttpRequestHeader.Accept.ToString(), $"application/vnd.twitchtv.v{(int)api}+json");
+            }
+            if (!string.IsNullOrEmpty(accessToken))
+                request.Headers.Add(HttpRequestHeader.Authorization.ToString(), $"{authPrefix} {Common.Helpers.FormatOAuth(accessToken)}");
+
+            var response = await _http.SendAsync(request).ConfigureAwait(false);
+            if (response.IsSuccessStatusCode)
+            {
+                var respStr = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                return new KeyValuePair<int, string>((int)response.StatusCode, respStr);
+            }
+
+            HandleWebException(response);
+            return new KeyValuePair<int, string>(0, null);
+        }
+
         private void HandleWebException(HttpResponseMessage errorResp)
         {
             switch (errorResp.StatusCode)

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using TwitchLib.Api.Core;
 using TwitchLib.Api.Core.Enums;
@@ -85,31 +86,20 @@ namespace TwitchLib.Api.V5
 
             var data = new List<KeyValuePair<string, string>>();
             if (!string.IsNullOrEmpty(status))
-                data.Add(new KeyValuePair<string, string>("status", "\"" + status + "\""));
+                data.Add(new KeyValuePair<string, string>("channel[status]", status));
             if (!string.IsNullOrEmpty(game))
-                data.Add(new KeyValuePair<string, string>("game", "\"" + game + "\""));
+                data.Add(new KeyValuePair<string, string>("channel[game]", game));
             if (!string.IsNullOrEmpty(delay))
-                data.Add(new KeyValuePair<string, string>("delay", "\"" + delay + "\""));
+                data.Add(new KeyValuePair<string, string>("channel[delay]", delay));
             if (channelFeedEnabled.HasValue)
-                data.Add(new KeyValuePair<string, string>("channel_feed_enabled", channelFeedEnabled == true ? "true" : "false"));
+                data.Add(new KeyValuePair<string, string>("channel[channel_feed_enabled]", channelFeedEnabled == true ? "true" : "false"));
 
-            var payload = "";
-            switch (data.Count)
-            {
-                case 0:
-                    throw new BadParameterException("At least one parameter must be specified: status, game, delay, channel_feed_enabled.");
-                case 1:
-                    payload = $"\"{data[0].Key}\": {data[0].Value}";
-                    break;
-                default:
-                    for (var i = 0; i < data.Count; i++) payload = data.Count - i > 1 ? $"{payload}\"{data[i].Key}\": {data[i].Value}," : $"{payload}\"{data[i].Key}\": {data[i].Value}";
+            if (data.Count == 0)
+                throw new BadParameterException("At least one parameter must be specified: status, game, delay, channel_feed_enabled.");
 
-                    break;
-            }
+            var payload = new FormUrlEncodedContent(data);
 
-            payload = "{ \"channel\": {" + payload + "} }";
-
-            return await TwitchPutGenericAsync<Channel>($"/channels/{channelId}", ApiVersion.V5, payload, accessToken: authToken).ConfigureAwait(false);
+            return await TwitchCustomRequestAsync<Channel>($"/channels/{channelId}", ApiVersion.V5, "PUT", payload, accessToken: authToken).ConfigureAwait(false);
         }
 
         #endregion
